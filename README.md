@@ -71,6 +71,15 @@ A minimal containerized setup lives in `infra/compose/docker-compose.yml` and wi
 docker compose -f infra/compose/docker-compose.yml up --build
 ```
 
+The Postgres container persists data in the named volume `postgres-data`, so your generated meal plans and preferences survive restarts. Prune that volume if you need a clean database.
+
+The backend container reads the following n8n-related environment variables:
+
+- `DIET_N8N_BASE_URL` — Base URL for the n8n instance (`http://n8n:5678` within the compose network).
+- `DIET_N8N_MEAL_PLAN_PATH` — The webhook path the workflow exposes. Defaults to `webhook-test/testpath`; adjust to your active workflow URL (without the host).
+- `DIET_N8N_BASIC_AUTH_USER` / `DIET_N8N_BASIC_AUTH_PASSWORD` — Credentials passed as HTTP basic auth when invoking the webhook. Match them with the `N8N_BASIC_AUTH_*` values on the n8n service.
+- `DIET_N8N_API_KEY` (optional) — When set, sent as a bearer token header for additional security.
+
 ### n8n Workflow
 
 - The meal plan generator posts to the n8n webhook configured by `DIET_N8N_MEAL_PLAN_PATH` (default `testpath`). Leaving the variable empty falls back to the in-process stub generator.

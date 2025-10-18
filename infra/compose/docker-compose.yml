@@ -16,6 +16,9 @@ services:
       dockerfile: infra/docker/Dockerfile.backend
     environment:
       - DIET_N8N_BASE_URL=http://n8n:5678
+      - DIET_N8N_MEAL_PLAN_PATH=webhook-test/testpath
+      - DIET_N8N_BASIC_AUTH_USER=admin
+      - DIET_N8N_BASIC_AUTH_PASSWORD=admin
     ports:
       - '8000:8000'
     depends_on:
@@ -47,6 +50,8 @@ services:
       - POSTGRES_DB=dietplanner
       - POSTGRES_USER=dp
       - POSTGRES_PASSWORD=dp
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     ports:
       - '5432:5432'
 
@@ -54,3 +59,6 @@ services:
     image: redis:7
     ports:
       - '6379:6379'
+
+volumes:
+  postgres-data:

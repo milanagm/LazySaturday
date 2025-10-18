@@ -27,7 +27,12 @@ from ..domain.meal_planning.stub_generator import StubMealPlanGenerator
 api_router = APIRouter()
 _settings = get_settings()
 if _settings.n8n_meal_plan_path:
-    _n8n_client = N8NClient(base_url=_settings.n8n_base_url, api_key=_settings.n8n_api_key)
+    _n8n_client = N8NClient(
+        base_url=_settings.n8n_base_url,
+        api_key=_settings.n8n_api_key,
+        basic_auth_user=_settings.n8n_basic_auth_user,
+        basic_auth_password=_settings.n8n_basic_auth_password,
+    )
     _meal_plan_generator = N8NMealPlanGenerator(client=_n8n_client, workflow_path=_settings.n8n_meal_plan_path)
     _fallback_generator = StubMealPlanGenerator()
     _meal_plan_service = MealPlanService.create_with_generator(
