@@ -1,0 +1,6 @@
+{
+  "name": "notification_dispatch",
+  "description": "Placeholder workflow for daily notification dispatch.",
+  "nodes": [],
+  "connections": {}
+}
