@@ -1,0 +1,28 @@
+### Test trigger for meal generation workflow via n8n webhook
+POST https://gurbanovam.app.n8n.cloud/webhook-test/testpath
+Content-Type: application/json
+
+{
+  "user": {
+    "id": "9e3b3a3c-4f5a-4b6b-8123-62b2d1e0a9c8",
+    "email": "amina.berlin@example.com",
+    "locale": "de-DE"
+  },
+  "preferences": {
+    "diet_id": "balanced",
+    "culture_id": "moroccan",
+    "additional_cultures": ["german"],
+    "country": "germany",
+    "city": "berlin",
+    "dietary_goals": ["healthy_eating", "time_saving"],
+    "allergies": ["nuts"],
+    "disliked_ingredients": ["okra"],
+    "meals_per_day": 3,
+    "household_size": 2,
+    "cooking_time_limit": 30
+  },
+  "context": {
+    "trigger": "manual-test",
+    "requested_at": "2025-01-12T18:30:00Z"
+  }
+}
