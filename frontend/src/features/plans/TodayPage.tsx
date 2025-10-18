@@ -39,7 +39,8 @@ const TodayPage = () => {
     queryKey: ['plan', 'today'],
     queryFn: api.getTodayOverview,
     staleTime: 1000 * 60 * 5,
-    enabled: Boolean(user)
+    enabled: Boolean(user),
+    refetchInterval: ({ state }) => (state.data?.plan_status === 'pending' ? 5000 : false)
   });
 
   const friendlyName = user?.email?.split('@')[0] ?? 'friend';

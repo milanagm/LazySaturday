@@ -36,29 +36,23 @@ diet-planner/
 
 ## Getting Started
 
-1. **Create & activate backend virtualenv**
-   ```bash
-   make backend-venv
-   source .venv/bin/activate
-   ```
-
-2. **Start the backend**
+1. **Start the backend stack (FastAPI + Postgres + Redis + n8n)**
    ```bash
    make backend
    ```
 
-3. **Start the frontend**
+2. **Start the frontend**
    ```bash
    make frontend
    ```
 
-4. **Open the app**
+3. **Open the app**
    Visit `http://localhost:5173` to explore the landing page. Use “Start Your Cultural Plan” to open the preferences wizard. Saving preferences now invokes the `create_dietaryplan` n8n workflow running at `http://localhost:5678`.
 
-5. **Review today’s plan**
+4. **Review today’s plan**
    After generating a plan, click “Today’s plan” in the header to see the current meal, upcoming dishes, and quick prep notes.
 
-6. **Run backend tests**
+5. **Run backend tests**
    ```bash
    make backend-test
    ```
@@ -80,12 +74,25 @@ The backend container reads the following n8n-related environment variables:
 - `DIET_N8N_BASIC_AUTH_USER` / `DIET_N8N_BASIC_AUTH_PASSWORD` — Credentials passed as HTTP basic auth when invoking the webhook. Match them with the `N8N_BASIC_AUTH_*` values on the n8n service.
 - `DIET_N8N_API_KEY` (optional) — When set, sent as a bearer token header for additional security.
 
+### Running without Docker (optional)
+
+For quick iteration you can still run the FastAPI app locally:
+
+```bash
+make backend-venv
+source .venv/bin/activate
+uvicorn backend.app.main:app --reload
+```
+
+Make sure Postgres, Redis, and n8n are available (e.g., via `docker compose up postgres redis n8n`).
+
 ### n8n Workflow
 
 - The meal plan generator posts to the n8n webhook configured by `DIET_N8N_MEAL_PLAN_PATH` (default `testpath`). Leaving the variable empty falls back to the in-process stub generator.
 - Import `workflows/n8n/create_dietaryplan.json` into your local n8n instance or let the synced volume populate it, then activate the workflow.
 - Provide a Gemini / PaLM API credential inside n8n named `Google Gemini(PaLM) Api account` to satisfy the workflow nodes, or swap the LLM node for an available provider.
 - When developing without n8n, set `DIET_N8N_MEAL_PLAN_PATH=` (empty) and swap the generator back to the stub inside `backend/app/api/routes.py`.
+- When the workflow finishes, POST the generated plan back to `POST /api/workflows/plan-complete` (see `docs/rest-calls/n8n-plan-callback.http`). The backend stores the plan asynchronously and updates users’ dashboards.
 
 ## Next Steps
 

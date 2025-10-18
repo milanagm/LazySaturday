@@ -1,4 +1,8 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
@@ -20,7 +24,7 @@ from ..schemas.user import (
     UserPreferencesView,
     UserProfileResponse,
 )
-from ..schemas.workflow import WorkflowCallback
+from ..schemas.workflow import WorkflowPlanCallback
 from ..domain.meal_planning.n8n_generator import N8NMealPlanGenerator
 from ..domain.meal_planning.stub_generator import StubMealPlanGenerator
 
@@ -43,6 +47,7 @@ else:  # pragma: no cover - local override without n8n
     _meal_plan_generator = StubMealPlanGenerator()
     _meal_plan_service = MealPlanService.create_with_generator(_meal_plan_generator)
 _user_preference_service = UserPreferenceService()
+logger = logging.getLogger(__name__)
 
 
 def get_meal_plan_service() -> MealPlanService:
@@ -114,18 +119,12 @@ async def list_cultures() -> list[CultureResponse]:
 async def save_preferences(
     payload: UserPreferencesRequest,
     preferences_service: UserPreferenceService = Depends(get_user_preference_service),
-    meal_plan_service: MealPlanService = Depends(get_meal_plan_service),
     current_user=Depends(get_current_user),
 ) -> UserPreferencesSaveResponse:
     if payload.email.lower() != current_user.email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify another user's preferences")
 
     response = preferences_service.save_preferences(payload)
-    preferences_snapshot = preferences_service.get_preferences(payload.email)
-    meal_plan_service.create_meal_plan(
-        MealPlanCreateRequest(email=payload.email, diet_id=payload.diet_id, culture_id=payload.culture_id),
-        preferences=preferences_snapshot,
-    )
     return response
 
 
@@ -161,9 +160,23 @@ async def generate_plan(
             status_code=status.HTTP_403_FORBIDDEN, detail="Preferences override must match authenticated user"
         )
     try:
-        return service.create_meal_plan(request, preferences=preferences_snapshot)
+        plan = service.trigger_plan_generation(request, preferences=preferences_snapshot)
     except ValueError as exc:  # pragma: no cover - simple example
+        logger.error(
+            f"Failed to trigger meal plan generation {str(exc)}",
+            extra={
+                "email": request.email,
+                "diet_id": request.diet_id,
+                "culture_id": request.culture_id,
+                "error": str(exc),
+            },
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if plan.status == "pending":
+        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=jsonable_encoder(plan))
+
+    return plan
 
 
 @api_router.get("/plans/{plan_id}", response_model=MealPlanResponse, tags=["meal-plans"])
@@ -198,6 +211,14 @@ async def get_today_plan(
 
 
 @api_router.post("/workflows/plan-complete", tags=["workflows"])
-async def workflow_callback(callback: WorkflowCallback) -> dict[str, str]:
-    # Placeholder for workflow status reconciliation
+async def workflow_callback(
+    callback: WorkflowPlanCallback,
+    service: MealPlanService = Depends(get_meal_plan_service),
+) -> dict[str, str]:
+    status_normalized = callback.status.lower()
+    if status_normalized == "completed" and callback.plan:
+        plan = service.finalize_plan_from_callback(callback)
+        return {"workflow": callback.workflow_name, "status": callback.status, "plan_id": str(plan.id)}
+
+    service.mark_plan_failed(callback)
     return {"workflow": callback.workflow_name, "status": callback.status}

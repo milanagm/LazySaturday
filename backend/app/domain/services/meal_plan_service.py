@@ -19,6 +19,7 @@ from ...schemas.meal import (
     ShoppingListItem,
 )
 from ...schemas.user import UserPreferencesView
+from ...schemas.workflow import WorkflowPlanCallback
 from ..meal_planning.contracts import (
     GeneratedMeal,
     MealPlanGenerationContext,
@@ -110,7 +111,6 @@ class MealPlanService:
         self, payload: MealPlanCreateRequest, *, preferences: UserPreferencesView | None = None
     ) -> MealPlanResponse:
         context = self._build_context(payload, preferences)
-
         try:
             generation = self._generator.generate(context)
         except MealPlanGenerationError as exc:
@@ -119,28 +119,77 @@ class MealPlanService:
             else:
                 raise ValueError(f"Unable to generate meal plan: {exc.code}") from exc
 
-        plan_id = generation.plan_id or uuid4()
-        meals = [self._map_generated_meal(meal) for meal in generation.meals]
-        shopping_list = [self._map_shopping_list_entry(entry) for entry in generation.shopping_list]
-        summary = self._map_summary(generation)
-        warnings = [self._map_warning(warning) for warning in generation.warnings]
+        return self._store_generation(context, generation)
 
+    def trigger_plan_generation(
+        self, payload: MealPlanCreateRequest, *, preferences: UserPreferencesView | None = None
+    ) -> MealPlanResponse:
+        context = self._build_context(payload, preferences)
+
+        if hasattr(self._generator, "enqueue"):
+            try:
+                self._generator.enqueue(context)
+            except MealPlanGenerationError as exc:
+                if self._fallback_generator is not None:
+                    generation = self._fallback_generator.generate(context)
+                    return self._store_generation(context, generation)
+                raise ValueError(f"Unable to queue meal plan: {exc.code}") from exc
+            return self._create_pending_record(context)
+
+        try:
+            generation = self._generator.generate(context)
+        except MealPlanGenerationError as exc:
+            if self._fallback_generator is not None:
+                generation = self._fallback_generator.generate(context)
+            else:
+                raise ValueError(f"Unable to generate meal plan: {exc.code}") from exc
+        return self._store_generation(context, generation)
+
+    def finalize_plan_from_callback(self, callback: WorkflowPlanCallback) -> MealPlanResponse:
+        if not callback.plan:
+            raise ValueError("Callback missing plan payload")
+
+        plan_id = callback.plan.plan_id or callback.request_id
+        email = callback.user_email.lower()
         record = MealPlanRecord(
             id=plan_id,
-            user_email=context.user_email,
-            week_start=context.week_start,
-            meals=meals,
-            shopping_list=shopping_list,
-            summary=summary,
-            warnings=warnings,
-            status=generation.status,
-            diet_id=context.preferences.diet_id,
-            culture_id=context.preferences.culture_id,
+            user_email=email,
+            week_start=callback.plan.week_start,
+            meals=callback.plan.meals,
+            shopping_list=callback.plan.shopping_list,
+            summary=callback.plan.summary,
+            warnings=callback.plan.warnings,
+            status=callback.plan.status or callback.status,
+            diet_id=callback.plan.diet_id,
+            culture_id=callback.plan.culture_id,
         )
         self._storage[plan_id] = record
+        self._latest_by_user[email] = plan_id
         self._last_created_id = plan_id
-        self._latest_by_user[record.user_email.lower()] = plan_id
         return record.to_response()
+
+    def mark_plan_failed(self, callback: WorkflowPlanCallback) -> None:
+        email = callback.user_email.lower()
+        request_id = callback.request_id
+        record = self._storage.get(request_id)
+        if record:
+            record.status = callback.status
+        else:
+            record = MealPlanRecord(
+                id=request_id,
+                user_email=email,
+                week_start=date.today(),
+                meals=[],
+                shopping_list=[],
+                summary=None,
+                warnings=[],
+                status=callback.status,
+                diet_id="unknown",
+                culture_id="unknown",
+            )
+            self._storage[request_id] = record
+        self._latest_by_user[email] = request_id
+        self._last_created_id = request_id
 
     def get_meal_plan(self, plan_id: str) -> Optional[MealPlanResponse]:
         try:
@@ -347,6 +396,51 @@ class MealPlanService:
 
     def _map_warning(self, warning: ResultWarning) -> MealPlanWarning:
         return MealPlanWarning(code=warning.code, message=warning.message, blocking=warning.blocking)
+
+    def _store_generation(
+        self, context: MealPlanGenerationContext, generation: MealPlanGenerationResult
+    ) -> MealPlanResponse:
+        plan_id = generation.plan_id or uuid4()
+        meals = [self._map_generated_meal(meal) for meal in generation.meals]
+        shopping_list = [self._map_shopping_list_entry(entry) for entry in generation.shopping_list]
+        summary = self._map_summary(generation)
+        warnings = [self._map_warning(warning) for warning in generation.warnings]
+
+        record = MealPlanRecord(
+            id=plan_id,
+            user_email=context.user_email,
+            week_start=context.week_start,
+            meals=meals,
+            shopping_list=shopping_list,
+            summary=summary,
+            warnings=warnings,
+            status=generation.status,
+            diet_id=context.preferences.diet_id,
+            culture_id=context.preferences.culture_id,
+        )
+        self._storage[plan_id] = record
+        self._last_created_id = plan_id
+        self._latest_by_user[context.user_email] = plan_id
+        return record.to_response()
+
+    def _create_pending_record(self, context: MealPlanGenerationContext) -> MealPlanResponse:
+        plan_id = context.request_id
+        record = MealPlanRecord(
+            id=plan_id,
+            user_email=context.user_email,
+            week_start=context.week_start,
+            meals=[],
+            shopping_list=[],
+            summary=None,
+            warnings=[],
+            status="pending",
+            diet_id=context.preferences.diet_id,
+            culture_id=context.preferences.culture_id,
+        )
+        self._storage[plan_id] = record
+        self._last_created_id = plan_id
+        self._latest_by_user[context.user_email] = plan_id
+        return record.to_response()
 
     def _get_latest_record(self, email: str | None) -> MealPlanRecord | None:
         if email:

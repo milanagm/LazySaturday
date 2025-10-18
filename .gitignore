@@ -11,3 +11,4 @@ __pycache__
 .idea/
 .vscode/
 .venv
+workflows/n8n/ceate_dienatry_plan_v2.json

@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Card,
   CardContent,
@@ -22,7 +23,8 @@ const MealPlanPreview = () => {
   const { data, isFetching } = useQuery({
     queryKey: ['meal-plan', userEmail],
     queryFn: api.getLatestMealPlan,
-    enabled: Boolean(userEmail)
+    enabled: Boolean(userEmail),
+    refetchInterval: ({ state }) => (state.data?.status === 'pending' ? 5000 : false)
   });
   const savedPreferences = queryClient.getQueryData<PreferencesPayload | null>([
     'user-preferences',
@@ -42,6 +44,10 @@ const MealPlanPreview = () => {
     mutationFn: () => api.generatePlan(planPayload),
     onSuccess: (plan) => {
       queryClient.setQueryData(['meal-plan', userEmail], plan);
+      queryClient.invalidateQueries({ queryKey: ['plan', 'today'] });
+      if (plan.status === 'pending') {
+        queryClient.invalidateQueries({ queryKey: ['meal-plan', userEmail] });
+      }
     }
   });
 
@@ -65,6 +71,11 @@ const MealPlanPreview = () => {
         {data && (
           <Stack spacing={2}>
             <Typography variant="subtitle1">Week starting {data.week_start}</Typography>
+            {data.status === 'pending' && (
+              <Alert severity="info" variant="outlined">
+                Your cultural plan is being crafted. We will notify you once the meals are ready.
+              </Alert>
+            )}
             {data.summary && (
               <Stack spacing={1}>
                 <Typography variant="body2">{data.summary.overview}</Typography>
@@ -75,29 +86,41 @@ const MealPlanPreview = () => {
                 )}
               </Stack>
             )}
-            <Divider textAlign="left">Meals</Divider>
-            <List dense>
-              {data.meals.map((meal) => (
-                <ListItem key={`${meal.day_of_week}-${meal.meal_type}-${meal.recipe_id ?? ''}`}>
-                  <ListItemText
-                    primary={`${meal.day_of_week} – ${meal.recipe_title}`}
-                    secondary={
-                      meal.instruction_steps.length
-                        ? meal.instruction_steps.map((step) => `${step.step_number}. ${step.description}`).join(' ')
-                        : meal.instructions
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
-            <Divider textAlign="left">Shopping List</Divider>
-            <List dense>
-              {data.shopping_list.map((item) => (
-                <ListItem key={item.name}>
-                  <ListItemText primary={`${item.name}: ${item.quantity}`} />
-                </ListItem>
-              ))}
-            </List>
+            {data.meals.length > 0 ? (
+              <>
+                <Divider textAlign="left">Meals</Divider>
+                <List dense>
+                  {data.meals.map((meal) => (
+                    <ListItem key={`${meal.day_of_week}-${meal.meal_type}-${meal.recipe_id ?? ''}`}>
+                      <ListItemText
+                        primary={`${meal.day_of_week} – ${meal.recipe_title}`}
+                        secondary={
+                          meal.instruction_steps.length
+                            ? meal.instruction_steps
+                                .map((step) => `${step.step_number}. ${step.description}`)
+                                .join(' ')
+                            : meal.instructions
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+                <Divider textAlign="left">Shopping List</Divider>
+                <List dense>
+                  {data.shopping_list.map((item) => (
+                    <ListItem key={item.name}>
+                      <ListItemText primary={`${item.name}: ${item.quantity}`} />
+                    </ListItem>
+                  ))}
+                </List>
+              </>
+            ) : (
+              data.status !== 'pending' && (
+                <Typography variant="body2" color="text.secondary">
+                  No meals available yet. Generate a plan to see your weekly dishes.
+                </Typography>
+              )
+            )}
             {data.warnings.length > 0 && (
               <>
                 <Divider textAlign="left">Warnings</Divider>

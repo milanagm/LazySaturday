@@ -5,9 +5,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     app_name: str = "diet-planner"
-    n8n_base_url: str = "http://n8n:5678"
+    n8n_base_url: str = "http://localhost:5678"
     n8n_api_key: str | None = None
-    n8n_meal_plan_path: str = "testpath"
+    n8n_meal_plan_path: str = "webhook/testpath"
     n8n_basic_auth_user: str | None = None
     n8n_basic_auth_password: str | None = None
     database_url: str = "postgresql+psycopg://dp:dp@localhost:5432/dietplanner"

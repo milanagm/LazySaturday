@@ -1,0 +1,71 @@
+### Example payload n8n should POST back after generating a meal plan
+POST http://backend:8000/api/workflows/plan-complete
+Content-Type: application/json
+Authorization: Bearer <SERVICE_TOKEN>
+
+{
+  "request_id": "9e3b3a3c-4f5a-4b6b-8123-62b2d1e0a9c8",
+  "workflow_name": "diet-plan-start",
+  "status": "completed",
+  "user_email": "amina.berlin@example.com",
+  "plan": {
+    "plan_id": "d0a5cc1f-7f67-4b3f-9bfd-6d8896a4d3d4",
+    "week_start": "2025-01-13",
+    "diet_id": "balanced",
+    "culture_id": "moroccan",
+    "meals": [
+      {
+        "day_of_week": "monday",
+        "meal_type": "dinner",
+        "recipe_id": "moroccan-1",
+        "recipe_title": "Moroccan Chickpea Tagine",
+        "instructions": "Serve with couscous.\nGarnish with herbs.",
+        "ingredients": [
+          { "name": "Chickpeas", "quantity": 0.5, "unit": "kg" },
+          { "name": "Harissa", "quantity": 2, "unit": "tbsp" }
+        ],
+        "instruction_steps": [
+          { "step_number": 1, "description": "Soak chickpeas", "duration_minutes": 30 },
+          { "step_number": 2, "description": "Simmer with spices", "duration_minutes": 40 }
+        ],
+        "nutrition": {
+          "calories": 620,
+          "protein_g": 24,
+          "carbs_g": 68,
+          "fats_g": 18,
+          "fiber_g": 14,
+          "micronutrients": {
+            "iron_mg": 5.2
+          }
+        },
+        "prep_time_minutes": 15,
+        "cook_time_minutes": 45,
+        "source": "n8n-workflow",
+        "tags": ["vegan", "spicy"]
+      }
+    ],
+    "shopping_list": [
+      {
+        "name": "Chickpeas",
+        "quantity": "2 cans",
+        "category": "pantry",
+        "is_pantry": false
+      }
+    ],
+    "summary": {
+      "overview": "Balanced Moroccan-inspired dinners with quick prep.",
+      "calorie_total": 4200,
+      "macro_totals": {
+        "calories": 4200,
+        "protein_g": 150,
+        "carbs_g": 480,
+        "fats_g": 140,
+        "fiber_g": 90,
+        "micronutrients": {}
+      },
+      "allergy_warnings": [],
+      "variety_score": 0.75
+    },
+    "warnings": []
+  }
+}

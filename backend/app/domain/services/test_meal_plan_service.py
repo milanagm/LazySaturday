@@ -1,11 +1,12 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 import pytest
 
 from ..meal_planning.stub_generator import StubMealPlanGenerator
 
 from .meal_plan_service import MealPlanService
-from ...schemas.meal import MealPlanCreateRequest
+from ...schemas.meal import MealItem, MealPlanCreateRequest, ShoppingListItem
+from ...schemas.workflow import WorkflowPlanCallback, WorkflowPlanDetails
 
 
 def test_create_meal_plan_generates_week() -> None:
@@ -84,3 +85,83 @@ def test_today_overview_highlights_current_meal() -> None:
     assert overview.current_meal is not None
     assert overview.current_meal.status == "current"
     assert overview.current_meal.meal_type == "dinner"
+
+
+class AsyncOnlyGenerator:
+    def __init__(self) -> None:
+        self.enqueued = False
+
+    def enqueue(self, context):  # type: ignore[no-untyped-def]
+        self.enqueued = True
+
+    def generate(self, context):  # type: ignore[no-untyped-def]
+        raise AssertionError("generate should not be called when enqueue is available")
+
+
+def test_trigger_plan_generation_creates_pending_record_when_enqueue_available() -> None:
+    service = MealPlanService.create_with_generator(AsyncOnlyGenerator())
+    payload = MealPlanCreateRequest(email="user@example.com", diet_id="balanced", culture_id="indian")
+
+    response = service.trigger_plan_generation(payload)
+
+    assert response.status == "pending"
+    assert response.meals == []
+    latest = service.get_latest("user@example.com")
+    assert latest is not None
+    assert latest.status == "pending"
+
+
+def test_finalize_plan_from_callback_replaces_pending_plan() -> None:
+    service = MealPlanService.create_with_generator(AsyncOnlyGenerator())
+    payload = MealPlanCreateRequest(email="user@example.com", diet_id="balanced", culture_id="indian")
+    pending = service.trigger_plan_generation(payload)
+
+    callback = WorkflowPlanCallback(
+        request_id=pending.id,
+        workflow_name="diet-plan-start",
+        status="completed",
+        user_email="user@example.com",
+        plan=WorkflowPlanDetails(
+            plan_id=pending.id,
+            week_start=date.today(),
+            diet_id="balanced",
+            culture_id="indian",
+            meals=[
+                MealItem(day_of_week="monday", meal_type="dinner", recipe_title="Test Meal")
+            ],
+            shopping_list=[ShoppingListItem(name="Test", quantity="1 item")],
+            summary=None,
+            warnings=[],
+            status="ready",
+        ),
+    )
+
+    stored = service.finalize_plan_from_callback(callback)
+
+    assert stored.status == "ready"
+    assert len(stored.meals) == 1
+    latest = service.get_latest("user@example.com")
+    assert latest is not None
+    assert latest.status == "ready"
+    assert latest.id == stored.id
+
+
+def test_mark_plan_failed_updates_placeholder() -> None:
+    service = MealPlanService.create_with_generator(AsyncOnlyGenerator())
+    payload = MealPlanCreateRequest(email="user@example.com", diet_id="balanced", culture_id="indian")
+    pending = service.trigger_plan_generation(payload)
+
+    callback = WorkflowPlanCallback(
+        request_id=pending.id,
+        workflow_name="diet-plan-start",
+        status="failed",
+        user_email="user@example.com",
+        plan=None,
+        error={"message": "timeout"},
+    )
+
+    service.mark_plan_failed(callback)
+
+    latest = service.get_latest("user@example.com")
+    assert latest is not None
+    assert latest.status == "failed"

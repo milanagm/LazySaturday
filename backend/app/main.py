@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 
 from .api.routes import api_router
@@ -6,6 +8,7 @@ from .core.database import Base, engine
 
 def create_app() -> FastAPI:
     """Application factory used by ASGI servers."""
+    logging.basicConfig(level=logging.INFO)
     app = FastAPI(
         title="Culturally Adaptive Diet Planner API",
         version="0.1.0",
