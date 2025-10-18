@@ -34,11 +34,9 @@ import {
   type PreferencesPayload,
   type SavePreferencesResponse
 } from '../../lib/api/client';
-
-const emailSchema = z.string().email();
+import { useAuth } from '../../app/AuthProvider';
 
 const schema = z.object({
-  email: emailSchema,
   dietId: z.string().min(1, 'Please select a diet'),
   cultureIds: z.array(z.string()).min(1, 'Select at least one culture'),
   country: z.string().min(1, 'Please choose your country'),
@@ -54,7 +52,6 @@ const schema = z.object({
 export type PreferencesFormValues = z.infer<typeof schema>;
 
 const DEFAULT_VALUES: PreferencesFormValues = {
-  email: 'demo@example.com',
   dietId: 'balanced',
   cultureIds: ['indian'],
   country: 'germany',
@@ -135,11 +132,11 @@ const steps = [
   { label: 'Allergies' }
 ];
 
-const toPayload = (values: PreferencesFormValues): PreferencesPayload => {
+const toPayload = (values: PreferencesFormValues, email: string): PreferencesPayload => {
   const cultures = values.cultureIds.length ? values.cultureIds : ['indian'];
   const [primaryCulture, ...additionalCultures] = cultures;
   return {
-    email: values.email,
+    email,
     diet_id: values.dietId,
     culture_id: primaryCulture,
     additional_cultures: additionalCultures,
@@ -159,7 +156,6 @@ const fromPayload = (payload: PreferencesPayload): PreferencesFormValues => {
     (cultureId): cultureId is string => Boolean(cultureId)
   );
   return {
-    email: payload.email,
     dietId: payload.diet_id,
     cultureIds: cultures.length ? cultures : ['indian'],
     country: payload.country,
@@ -182,6 +178,7 @@ const flagFromCode = (code: string) => {
 
 const PreferencesForm = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const methods = useForm<PreferencesFormValues>({
     resolver: zodResolver(schema),
     defaultValues: DEFAULT_VALUES,
@@ -189,6 +186,7 @@ const PreferencesForm = () => {
   });
   const { control, reset, getValues } = methods;
 
+  const userEmail = user?.email ?? '';
   const [activeStep, setActiveStep] = useState(0);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
@@ -198,15 +196,6 @@ const PreferencesForm = () => {
   const lastSavedPayload = useRef<string>('');
   const saveResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasHydrated = useRef(false);
-
-  const watchedEmail = useWatch({ control, name: 'email' });
-  const [queryEmail, setQueryEmail] = useState(DEFAULT_VALUES.email);
-
-  useEffect(() => {
-    if (emailSchema.safeParse(watchedEmail).success) {
-      setQueryEmail(watchedEmail);
-    }
-  }, [watchedEmail]);
 
   useEffect(
     () => () => {
@@ -222,13 +211,13 @@ const PreferencesForm = () => {
   const { data: culturesData = [] } = useQuery({ queryKey: ['cultures'], queryFn: api.fetchCultures });
 
   const { data: storedPreferences } = useQuery({
-    queryKey: ['user-preferences', queryEmail],
-    queryFn: () => api.getPreferences(queryEmail),
-    enabled: Boolean(queryEmail)
+    queryKey: ['user-preferences', userEmail],
+    queryFn: api.getPreferences,
+    enabled: Boolean(userEmail)
   });
 
   useEffect(() => {
-    if (storedPreferences) {
+    if (storedPreferences && userEmail) {
       const formValues = fromPayload(storedPreferences);
       reset(formValues, { keepDirty: false });
       lastSavedPayload.current = JSON.stringify(storedPreferences);
@@ -237,7 +226,7 @@ const PreferencesForm = () => {
       hasHydrated.current = true;
       formReadyRef.current = true;
     }
-  }, [storedPreferences, reset]);
+  }, [storedPreferences, reset, userEmail]);
 
   const mutation = useMutation({
     mutationFn: api.savePreferences,
@@ -257,7 +246,7 @@ const PreferencesForm = () => {
       saveResetTimer.current = window.setTimeout(() => setSaveState('idle'), 2000);
       if (generationRef.current) {
         setSnackbarMessage(data.message);
-        queryClient.invalidateQueries({ queryKey: ['meal-plan'] });
+        queryClient.invalidateQueries({ queryKey: ['meal-plan', userEmail] });
       }
     },
     onError: () => {
@@ -287,7 +276,10 @@ const PreferencesForm = () => {
     if (!parsed.success) {
       return;
     }
-    const payload = toPayload(parsed.data);
+    if (!userEmail) {
+      return;
+    }
+    const payload = toPayload(parsed.data, userEmail);
     const payloadKey = JSON.stringify(payload);
     if (payloadKey === lastSavedPayload.current) {
       return;
@@ -308,27 +300,39 @@ const PreferencesForm = () => {
       setActiveStep(0);
       return;
     }
-    const payload = toPayload(parsed.data);
+    if (!userEmail) {
+      return;
+    }
+    const payload = toPayload(parsed.data, userEmail);
     generationRef.current = true;
     setIsGenerating(true);
     mutate(payload, {
       onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: ['meal-plan'] });
+        queryClient.invalidateQueries({ queryKey: ['meal-plan', userEmail] });
       }
     });
   };
 
   const diets = useMemo(() => (dietsData.length ? dietsData : FALLBACK_DIETS), [dietsData]);
-  const cultures = useMemo(() => culturesData, [culturesData]);
+  const cultures = useMemo(() => (culturesData.length ? culturesData : FALLBACK_CULTURES), [culturesData]);
+
+  if (!userEmail) {
+    return null;
+  }
 
   return (
     <FormProvider {...methods}>
       <Stack spacing={3}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Personalise Your Meal Experience</Typography>
-          {saveState === 'saving' && <Chip color="info" label="Saving…" size="small" />}
-          {saveState === 'saved' && <Chip color="success" label="Saved ✓" size="small" />}
-          {saveState === 'error' && <Chip color="error" label="Save failed" size="small" />}
+        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="h6">Personalise Your Meal Experience</Typography>
+            <Chip label={userEmail} size="small" variant="outlined" />
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center">
+            {saveState === 'saving' && <Chip color="info" label="Saving…" size="small" />}
+            {saveState === 'saved' && <Chip color="success" label="Saved ✓" size="small" />}
+            {saveState === 'error' && <Chip color="error" label="Save failed" size="small" />}
+          </Stack>
         </Stack>
 
         <Stepper activeStep={activeStep} alternativeLabel>

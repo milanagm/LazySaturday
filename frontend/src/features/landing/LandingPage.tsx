@@ -18,6 +18,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import StarIcon from '@mui/icons-material/Star';
 import { styled } from '@mui/material/styles';
+import { useAuth } from '../../app/AuthProvider';
 
 const HeroImage = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -110,6 +111,11 @@ const deliverables = [
 ];
 
 const LandingPage = () => {
+  const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
+  const primaryCtaTarget = isAuthenticated ? '/preferences' : '/auth?redirect=/preferences';
+  const primaryCtaLabel = isAuthenticated ? 'Open Your Planner' : 'Start Your Cultural Plan';
+
   return (
     <Box sx={{ backgroundColor: 'background.default', minHeight: '100vh' }}>
       <Box
@@ -135,12 +141,12 @@ const LandingPage = () => {
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <Button
                     component={RouterLink}
-                    to="/preferences"
+                    to={primaryCtaTarget}
                     variant="contained"
                     size="large"
                     endIcon={<ArrowForwardIcon />}
                   >
-                    Start Your Cultural Plan
+                    {primaryCtaLabel}
                   </Button>
                   <Button
                     href="#how-it-works"

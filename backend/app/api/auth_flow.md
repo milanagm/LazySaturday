@@ -66,3 +66,9 @@ Include the `Authorization` header for all endpoints that operate on user data (
 | `DIET_DATABASE_URL` | SQLAlchemy DSN | `postgresql+psycopg://dp:dp@localhost:5432/dietplanner` |
 | `DIET_JWT_SECRET_KEY` | JWT signing secret | `change-me` |
 | `DIET_ACCESS_TOKEN_EXPIRES_MINUTES` | Access token TTL | `15` |
+
+## Frontend integration
+
+- Landing page “Start Your Cultural Plan” sends unauthenticated visitors to `/auth?redirect=/preferences`.
+- Authenticated users open `/preferences` directly where their stored profile auto-populates the form.
+- Tokens persist in the browser's storage and attach to subsequent API requests via the shared API client.
