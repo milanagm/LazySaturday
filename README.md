@@ -47,11 +47,9 @@ diet-planner/
    make backend
    ```
 
-3. **Install frontend deps**
+3. **Start the frontend**
    ```bash
-   cd frontend
-   npm install
-   npm run dev
+   make frontend
    ```
 
 4. **Open the app**

@@ -10,9 +10,8 @@
 ## Build, Test, and Development Commands
 - `make backend` — provision `.venv` if missing and run the FastAPI dev server via the local Uvicorn binary.
 - `make backend-venv` — idempotently create `.venv`, install backend requirements, and remind you to `source .venv/bin/activate`.
-- `make frontend` — launch the Vite dev server on port 5173.
+- `make frontend` — install `frontend` dependencies on demand and launch the Vite dev server on port 5173.
 - `make up` / `make down` — start or stop the Docker Compose stack for all services.
-- `pip install -r backend/requirements.txt` and `npm install` (inside `frontend/`) — install runtime dependencies before local work.
 
 ## Coding Style & Naming Conventions
 - **Python**: follow PEP 8 with 4-space indentation. Prefer type hints and pydantic models for request/response DTOs. Place shared constants in `backend/app/core/`.
