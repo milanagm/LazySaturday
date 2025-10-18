@@ -72,6 +72,8 @@ class MealPlanResponse(BaseModel):
     id: UUID
     user_email: str
     week_start: date
+    diet_id: str
+    culture_id: str
     meals: list[MealItem] = Field(default_factory=list)
     shopping_list: list[ShoppingListItem] = Field(default_factory=list)
     summary: MealPlanSummary | None = None
@@ -86,3 +88,23 @@ class MealPlanCreateRequest(BaseModel):
     request_id: UUID | None = None
     preferences_override: UserPreferencesView | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TodayMeal(BaseModel):
+    meal_type: str
+    meal_label: str
+    recipe_title: str
+    instructions: str
+    scheduled_time: str
+    status: str
+    is_current: bool
+
+
+class TodayOverviewResponse(BaseModel):
+    date: date
+    greeting: str
+    diet_id: str
+    culture_id: str
+    plan_status: str
+    current_meal: TodayMeal | None
+    meals: list[TodayMeal]

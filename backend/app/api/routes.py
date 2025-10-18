@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 
 from ..core.database import get_db
 from ..core.security import get_current_user
+from ..core.config import get_settings
 from ..domain.services.auth_service import AuthService
 from ..domain.services.meal_plan_service import MealPlanService
 from ..domain.services.user_preference_service import UserPreferenceService
-from ..schemas.meal import MealPlanCreateRequest, MealPlanResponse
+from ..integrations.n8n_client import N8NClient
+from ..schemas.meal import MealPlanCreateRequest, MealPlanResponse, TodayOverviewResponse
 from ..schemas.metadata import CultureResponse, DietResponse
 from ..schemas.user import (
     LoginRequest,
@@ -19,9 +21,22 @@ from ..schemas.user import (
     UserProfileResponse,
 )
 from ..schemas.workflow import WorkflowCallback
+from ..domain.meal_planning.n8n_generator import N8NMealPlanGenerator
+from ..domain.meal_planning.stub_generator import StubMealPlanGenerator
 
 api_router = APIRouter()
-_meal_plan_service = MealPlanService.create_in_memory()
+_settings = get_settings()
+if _settings.n8n_meal_plan_path:
+    _n8n_client = N8NClient(base_url=_settings.n8n_base_url, api_key=_settings.n8n_api_key)
+    _meal_plan_generator = N8NMealPlanGenerator(client=_n8n_client, workflow_path=_settings.n8n_meal_plan_path)
+    _fallback_generator = StubMealPlanGenerator()
+    _meal_plan_service = MealPlanService.create_with_generator(
+        _meal_plan_generator,
+        fallback=_fallback_generator,
+    )
+else:  # pragma: no cover - local override without n8n
+    _meal_plan_generator = StubMealPlanGenerator()
+    _meal_plan_service = MealPlanService.create_with_generator(_meal_plan_generator)
 _user_preference_service = UserPreferenceService()
 
 
@@ -167,6 +182,14 @@ async def get_latest_plan(
     if latest and latest.user_email.lower() != current_user.email:
         return None
     return latest
+
+
+@api_router.get("/plans/today", response_model=TodayOverviewResponse | None, tags=["meal-plans"])
+async def get_today_plan(
+    service: MealPlanService = Depends(get_meal_plan_service),
+    current_user=Depends(get_current_user),
+) -> TodayOverviewResponse | None:
+    return service.get_today_overview(current_user.email)
 
 
 @api_router.post("/workflows/plan-complete", tags=["workflows"])

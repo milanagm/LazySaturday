@@ -1,0 +1,4 @@
+### Fetch today's meal overview for the authenticated user
+GET https://localhost:8000/api/plans/today
+Authorization: Bearer <ACCESS_TOKEN>
+Accept: application/json

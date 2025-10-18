@@ -30,9 +30,10 @@ services:
       - N8N_BASIC_AUTH_USER=admin
       - N8N_BASIC_AUTH_PASSWORD=admin
       - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=n8n
-      - DB_POSTGRESDB_PASSWORD=n8n
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - DB_POSTGRESDB_DATABASE=dietplanner
+      - DB_POSTGRESDB_USER=dp
+      - DB_POSTGRESDB_PASSWORD=dp
       - DB_POSTGRESDB_HOST=postgres
       - N8N_ENCRYPTION_KEY=local-dev-key
     ports:

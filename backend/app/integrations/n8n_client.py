@@ -12,11 +12,13 @@ class N8NClient:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
 
-    async def trigger_workflow(self, name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        headers = {}
+    def trigger_webhook(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        headers: Dict[str, str] = {}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(f"{self.base_url}/webhook/{name}", json=payload, headers=headers)
-            resp.raise_for_status()
+        webhook_path = path.lstrip("/")
+        resp = httpx.post(f"{self.base_url}/webhook/{webhook_path}", json=payload, headers=headers, timeout=30.0)
+        resp.raise_for_status()
+        if resp.content:
             return resp.json()
+        return {}

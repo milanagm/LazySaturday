@@ -18,12 +18,27 @@ export const setAuthToken = (token: string | null) => {
 };
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(init?.headers ?? {})
-  };
+  const headers = new Headers({
+    'Content-Type': 'application/json'
+  });
+
+  const incomingHeaders = init?.headers;
+  if (incomingHeaders instanceof Headers) {
+    incomingHeaders.forEach((value, key) => {
+      headers.set(key, value);
+    });
+  } else if (Array.isArray(incomingHeaders)) {
+    incomingHeaders.forEach(([key, value]) => {
+      headers.set(key, value);
+    });
+  } else if (incomingHeaders) {
+    Object.entries(incomingHeaders).forEach(([key, value]) => {
+      headers.set(key, value as string);
+    });
+  }
+
   if (authToken) {
-    headers.Authorization = `Bearer ${authToken}`;
+    headers.set('Authorization', `Bearer ${authToken}`);
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -131,11 +146,33 @@ export interface MealPlanResponse {
   id: string;
   user_email: string;
   week_start: string;
+  diet_id: string;
+  culture_id: string;
   meals: MealPlanItem[];
   shopping_list: ShoppingListItem[];
   summary?: MealPlanSummary | null;
   warnings: MealPlanWarning[];
   status: string;
+}
+
+export interface TodayMeal {
+  meal_type: string;
+  meal_label: string;
+  recipe_title: string;
+  instructions: string;
+  scheduled_time: string;
+  status: 'completed' | 'current' | 'upcoming';
+  is_current: boolean;
+}
+
+export interface TodayOverviewResponse {
+  date: string;
+  greeting: string;
+  diet_id: string;
+  culture_id: string;
+  plan_status: string;
+  current_meal: TodayMeal | null;
+  meals: TodayMeal[];
 }
 
 export interface DietOption {
@@ -202,6 +239,7 @@ export const api = {
     }),
   getPreferences: () => http<PreferencesPayload | null>('/user/preferences'),
   getLatestMealPlan: () => http<MealPlanResponse | null>('/plans/latest').catch(() => null),
+  getTodayOverview: () => http<TodayOverviewResponse | null>('/plans/today').catch(() => null),
   generatePlan: (payload: { email: string; diet_id: string; culture_id: string }) =>
     http<MealPlanResponse>('/plans/generate', {
       method: 'POST',

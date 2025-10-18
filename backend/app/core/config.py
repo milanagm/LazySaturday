@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "diet-planner"
     n8n_base_url: str = "http://n8n:5678"
     n8n_api_key: str | None = None
+    n8n_meal_plan_path: str = "testpath"
     database_url: str = "postgresql+psycopg://dp:dp@localhost:5432/dietplanner"
     access_token_expires_minutes: int = 15
     refresh_token_expires_minutes: int = 60 * 24 * 7

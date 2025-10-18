@@ -15,9 +15,9 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import LocalDiningIcon from '@mui/icons-material/LocalDining';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import StarIcon from '@mui/icons-material/Star';
 import { styled } from '@mui/material/styles';
+import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../../app/AuthProvider';
 
 const HeroImage = styled('div')(({ theme }) => ({
@@ -26,7 +26,7 @@ const HeroImage = styled('div')(({ theme }) => ({
   paddingTop: '75%',
   borderRadius: theme.shape.borderRadius * 2,
   overflow: 'hidden',
-  backgroundImage: 'url(/assets/hero-family-dinner.png)',
+  backgroundImage: 'url(/assets/hero-family-dinner.jpg)',
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   backgroundColor: '#f3c7a7',
@@ -41,13 +41,12 @@ const SecondaryImage = styled('div')(({ theme }) => ({
   paddingTop: '45%',
   borderRadius: theme.shape.borderRadius,
   overflow: 'hidden',
-  backgroundImage: 'url(/assets/hero-market-basket.png)',
+  backgroundImage: 'url(/assets/hero-market-basket.jpg)',
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   backgroundColor: '#e2b48c',
   border: `4px solid ${theme.palette.background.paper}`
 }));
-import { Link as RouterLink } from 'react-router-dom';
 
 const featureHighlights = [
   {

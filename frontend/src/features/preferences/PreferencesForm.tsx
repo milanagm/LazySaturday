@@ -8,11 +8,13 @@ import {
   Backdrop,
   Box,
   Button,
+  ButtonBase,
   Chip,
   CircularProgress,
   Divider,
   FormControlLabel,
   FormGroup,
+  IconButton,
   MenuItem,
   Slider,
   Snackbar,
@@ -22,11 +24,11 @@ import {
   Stepper,
   Switch,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   api,
   type CultureOption,
@@ -90,6 +92,19 @@ const DIET_DESCRIPTIONS: Record<string, string> = {
   pescatarian: 'Seafood forward with plant-based variety.',
   mediterranean: 'Olive oil, legumes, grains, and fresh produce.'
 };
+
+const DIET_IMAGES: Record<string, string> = {
+  balanced: 'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?auto=format&fit=crop&w=700&q=80',
+  vegan: 'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=700&q=80',
+  vegetarian: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=700&q=80',
+  halal: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=700&q=80',
+  pescatarian: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=700&q=80',
+  mediterranean: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=700&q=80',
+  low_carb: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=700&q=80'
+};
+
+const DEFAULT_DIET_IMAGE =
+  'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&w=700&q=80';
 
 const FALLBACK_DIETS: DietOption[] = [
   { id: 'balanced', name: 'Balanced' },
@@ -401,15 +416,64 @@ const PreferencesForm = () => {
 
 const DietStep = ({ diets }: { diets: DietOption[] }) => {
   const { control, setValue } = useFormContext<PreferencesFormValues>();
+  const selectedDiet = useWatch({ control, name: 'dietId' });
   const disliked = useWatch({ control, name: 'dislikedIngredients' }) ?? [];
   const [inputValue, setInputValue] = useState('');
   const [showAvoid, setShowAvoid] = useState(disliked.length > 0);
+  const carouselRef = useRef<HTMLDivElement | null>(null);
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(false);
+
+  const options = useMemo(
+    () =>
+      diets.map((diet) => ({
+        ...diet,
+        description: DIET_DESCRIPTIONS[diet.id] ?? 'Personalised recommendations.',
+        image: DIET_IMAGES[diet.id] ?? DEFAULT_DIET_IMAGE
+      })),
+    [diets]
+  );
+
+  useEffect(() => {
+    const element = carouselRef.current;
+    if (!element) return;
+
+    const updateScrollState = () => {
+      setAtStart(element.scrollLeft <= 32);
+      setAtEnd(element.scrollLeft + element.clientWidth >= element.scrollWidth - 32);
+    };
+
+    updateScrollState();
+    element.addEventListener('scroll', updateScrollState, { passive: true });
+    const resize = () => updateScrollState();
+    window.addEventListener('resize', resize);
+    return () => {
+      element.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', resize);
+    };
+  }, [options.length]);
 
   useEffect(() => {
     if (disliked.length && !showAvoid) {
       setShowAvoid(true);
     }
   }, [disliked.length, showAvoid]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    const element = carouselRef.current;
+    if (!element) return;
+    const scrollAmount = element.clientWidth * 0.8;
+    element.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
+
+  const handleSelect = (dietId: string) => {
+    if (dietId !== selectedDiet) {
+      setValue('dietId', dietId, { shouldDirty: true });
+    }
+  };
 
   const handleAdd = () => {
     const trimmed = inputValue.trim();
@@ -432,30 +496,113 @@ const DietStep = ({ diets }: { diets: DietOption[] }) => {
           Choose the pattern that matches your everyday eating habits.
         </Typography>
       </Stack>
-      <Controller
-        control={control}
-        name="dietId"
-        render={({ field }) => (
-          <ToggleButtonGroup
-            exclusive
-            value={field.value}
-            onChange={(_, value) => value && field.onChange(value)}
-            fullWidth
-            color="primary"
-          >
-            {diets.map((diet) => (
-              <ToggleButton key={diet.id} value={diet.id} sx={{ textTransform: 'none', py: 2 }}>
-                <Stack spacing={0.5} alignItems="center">
-                  <Typography fontWeight={600}>{diet.name}</Typography>
-                  <Typography variant="caption" color="text.secondary" textAlign="center">
-                    {DIET_DESCRIPTIONS[diet.id] ?? 'Personalised recommendations.'}
+
+      <Box position="relative" sx={{ px: { xs: 2, sm: 4 } }}>
+        <IconButton
+          onClick={() => handleScroll('left')}
+          disabled={atStart}
+          sx={{
+            position: 'absolute',
+            left: { xs: 4, sm: 8 },
+            top: '50%',
+            transform: 'translateY(-50%)',
+            bgcolor: 'background.paper',
+            boxShadow: 3,
+            zIndex: 2,
+            display: { xs: 'flex', md: 'inline-flex' }
+          }}
+          aria-label="Scroll left"
+        >
+          <ChevronLeftIcon />
+        </IconButton>
+        <Box
+          ref={carouselRef}
+          sx={{
+            display: 'flex',
+            gap: 3,
+            overflowX: 'auto',
+            scrollSnapType: 'x mandatory',
+            scrollPadding: '0 32px',
+            py: 1.5,
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none'
+          }}
+        >
+          {options.map((option) => {
+            const isSelected = option.id === selectedDiet;
+            return (
+              <ButtonBase
+                key={option.id}
+                focusRipple
+                onClick={() => handleSelect(option.id)}
+                sx={(theme) => ({
+                  flex: { xs: '0 0 85%', sm: '0 0 320px', md: '0 0 340px' },
+                  maxWidth: { xs: '100%', sm: 340 },
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  textAlign: 'left',
+                  border: '2px solid',
+                  borderColor: isSelected ? theme.palette.primary.main : 'transparent',
+                  backgroundColor: theme.palette.background.paper,
+                  boxShadow: isSelected ? theme.shadows[6] : theme.shadows[2],
+                  scrollSnapAlign: 'center',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignSelf: 'stretch',
+                  '.MuiTouchRipple-root': { color: theme.palette.primary.main },
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: theme.shadows[6]
+                  }
+                })}
+              >
+                <Box
+                  sx={{
+                    height: { xs: 180, sm: 190 },
+                    width: '100%',
+                    backgroundImage: `url(${option.image})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                />
+                <Stack spacing={1.5} sx={{ p: 2 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {option.name}
+                    </Typography>
+                    {isSelected && <Chip size="small" color="primary" label="Selected" />}
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    {option.description}
+                  </Typography>
+                  <Typography variant="caption" color="text.disabled">
+                    Click to set this as your default diet preference.
                   </Typography>
                 </Stack>
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        )}
-      />
+              </ButtonBase>
+            );
+          })}
+        </Box>
+        <IconButton
+          onClick={() => handleScroll('right')}
+          disabled={atEnd}
+          sx={{
+            position: 'absolute',
+            right: { xs: 4, sm: 8 },
+            top: '50%',
+            transform: 'translateY(-50%)',
+            bgcolor: 'background.paper',
+            boxShadow: 3,
+            zIndex: 2,
+            display: { xs: 'flex', md: 'inline-flex' }
+          }}
+          aria-label="Scroll right"
+        >
+          <ChevronRightIcon />
+        </IconButton>
+      </Box>
 
       <Stack spacing={1}>
         <FormControlLabel
