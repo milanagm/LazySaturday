@@ -10,3 +10,4 @@ __pycache__
 # Editors
 .idea/
 .vscode/
+.venv
