@@ -7,6 +7,13 @@ FRONTEND_DIR := frontend
 FRONTEND_BIN := $(FRONTEND_DIR)/node_modules/.bin
 
 backend: $(VENV_BIN)/uvicorn
+	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		echo "Starting backend dependencies with docker compose..."; \
+		docker compose -f infra/compose/docker-compose.yml up -d postgres redis n8n; \
+	else \
+		echo "⚠️  Docker unavailable or daemon not running. Skipping dependency containers."; \
+		echo "   Start postgres/redis/n8n manually if required."; \
+	fi
 	$(VENV_BIN)/uvicorn backend.app.main:app --reload
 
 backend-venv: $(VENV_BIN)/uvicorn

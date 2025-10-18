@@ -16,6 +16,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    expires_in: int
 
 
 class UserPreferencesRequest(BaseModel):
@@ -52,3 +53,14 @@ class UserPreferencesSaveResponse(BaseModel):
     status: str
     workflow_id: UUID
     message: str
+
+
+class UserProfileResponse(BaseModel):
+    id: UUID
+    email: EmailStr
+    is_verified: bool
+
+
+class TokenPayload(BaseModel):
+    sub: str
+    exp: int

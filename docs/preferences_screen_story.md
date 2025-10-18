@@ -16,6 +16,7 @@
 
 ## UI Flow
 1. **Entry Point (`/preferences`):** Post-login welcome message explaining personalisation benefit.
+   - Primary CTA on landing page (“Start Your Cultural Plan”) links directly here.
 2. **Diet Section:** Card grid (Vegan, Halal, Low-Carb, etc.) with tooltips; “Avoid specific foods” modal for dislikes.
 3. **Culture Section:** Two-level selector (region → culture) with iconography; allow “Mixed background” for multi-select.
 4. **Goals Section:** Icon chips for health, weight, muscle, sustainability, and time-saving.

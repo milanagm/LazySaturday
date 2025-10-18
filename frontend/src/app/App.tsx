@@ -1,17 +1,13 @@
-import { Container, Stack, Typography } from '@mui/material';
-import PreferencesForm from '../features/preferences/PreferencesForm';
-import MealPlanPreview from '../features/plans/MealPlanPreview';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import LandingPage from '../features/landing/LandingPage';
+import PreferencesPage from '../features/preferences/PreferencesPage';
 
 const App = () => (
-  <Container maxWidth="md" sx={{ py: 6 }}>
-    <Stack spacing={4}>
-      <Typography component="h1" variant="h4" fontWeight={600}>
-        Culturally Adaptive Diet Planner
-      </Typography>
-      <PreferencesForm />
-      <MealPlanPreview />
-    </Stack>
-  </Container>
+  <Routes>
+    <Route path="/" element={<LandingPage />} />
+    <Route path="/preferences" element={<PreferencesPage />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
 );
 
 export default App;

@@ -53,7 +53,7 @@ diet-planner/
    ```
 
 4. **Open the app**
-   Visit `http://localhost:5173` and use the form to trigger the stubbed meal plan generation workflow.
+   Visit `http://localhost:5173` to explore the landing page. Use “Start Your Cultural Plan” to open the preferences wizard and trigger the stubbed meal plan workflow.
 
 5. **Run backend tests**
    ```bash

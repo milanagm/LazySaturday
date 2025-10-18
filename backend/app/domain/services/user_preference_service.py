@@ -25,6 +25,7 @@ class UserPreferenceService:
     def save_preferences(self, payload: UserPreferencesRequest) -> UserPreferencesSaveResponse:
         workflow_id = uuid4()
         data = payload.model_dump()
+        data["email"] = payload.email.lower()
         for key in ("additional_cultures", "dietary_goals", "allergies", "disliked_ingredients"):
             data[key] = list(dict.fromkeys(data.get(key, [])))
         view = UserPreferencesView(**data)

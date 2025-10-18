@@ -61,6 +61,7 @@ class MealPlanService:
         self._storage = storage
         self._last_created_id: UUID | None = None
         self._generator = generator
+        self._latest_by_user: Dict[str, UUID] = {}
 
     @classmethod
     def create_in_memory(cls) -> "MealPlanService":
@@ -94,6 +95,7 @@ class MealPlanService:
         )
         self._storage[plan_id] = record
         self._last_created_id = plan_id
+        self._latest_by_user[record.user_email.lower()] = plan_id
         return record.to_response()
 
     def get_meal_plan(self, plan_id: str) -> Optional[MealPlanResponse]:
@@ -104,7 +106,13 @@ class MealPlanService:
         record = self._storage.get(uid)
         return record.to_response() if record else None
 
-    def get_latest(self) -> Optional[MealPlanResponse]:
+    def get_latest(self, email: str | None = None) -> Optional[MealPlanResponse]:
+        if email:
+            record_id = self._latest_by_user.get(email.lower())
+            if not record_id:
+                return None
+            record = self._storage.get(record_id)
+            return record.to_response() if record else None
         if not self._last_created_id:
             return None
         record = self._storage.get(self._last_created_id)
@@ -113,11 +121,12 @@ class MealPlanService:
     def _build_context(
         self, payload: MealPlanCreateRequest, preferences: UserPreferencesView | None
     ) -> MealPlanGenerationContext:
+        email = payload.email.lower()
         pref_snapshot = preferences or self._build_default_preferences(payload)
         previous_summary: PreviousPlanSummary | None = None
-
-        if self._last_created_id:
-            previous_record = self._storage.get(self._last_created_id)
+        previous_id = self._latest_by_user.get(email)
+        if previous_id:
+            previous_record = self._storage.get(previous_id)
             if previous_record:
                 previous_summary = PreviousPlanSummary(
                     plan_id=previous_record.id,
@@ -129,7 +138,7 @@ class MealPlanService:
         request_id = payload.request_id or uuid4()
         return MealPlanGenerationContext(
             request_id=request_id,
-            user_email=payload.email,
+            user_email=email,
             week_start=date.today(),
             preferences=pref_snapshot,
             previous_plan=previous_summary,
@@ -138,7 +147,7 @@ class MealPlanService:
 
     def _build_default_preferences(self, payload: MealPlanCreateRequest) -> UserPreferencesView:
         return UserPreferencesView(
-            email=payload.email,
+            email=payload.email.lower(),
             diet_id=payload.diet_id,
             culture_id=payload.culture_id,
             additional_cultures=[],

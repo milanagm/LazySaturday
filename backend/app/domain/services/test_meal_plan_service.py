@@ -28,7 +28,7 @@ def test_get_latest_returns_last_plan() -> None:
     payload = MealPlanCreateRequest(email="user@example.com", diet_id="vegan", culture_id="ethiopian")
     created = service.create_meal_plan(payload)
 
-    latest = service.get_latest()
+    latest = service.get_latest("user@example.com")
     assert latest is not None
     assert latest.id == created.id
     assert latest.user_email == "user@example.com"
@@ -37,6 +37,9 @@ def test_get_latest_returns_last_plan() -> None:
     retrieved = service.get_meal_plan(str(created.id))
     assert retrieved is not None
     assert retrieved.id == created.id
+
+    assert service.get_latest("someoneelse@example.com") is None
+    assert service.get_latest() is not None
 
 
 @pytest.mark.parametrize("plan_id", ["", "abc", "1234"])

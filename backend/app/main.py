@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from .api.routes import api_router
+from .core.database import Base, engine
 
 
 def create_app() -> FastAPI:
@@ -11,6 +12,11 @@ def create_app() -> FastAPI:
         description="Minimal stub aligning with the design document architecture.",
     )
     app.include_router(api_router, prefix="/api")
+
+    @app.on_event("startup")
+    def startup_event() -> None:  # pragma: no cover - framework hook
+        Base.metadata.create_all(bind=engine)
+
     return app
 
 
