@@ -1,5 +1,3 @@
-import type { PreferencesFormValues } from '../../features/preferences/PreferencesForm';
-
 const baseUrl = '/api';
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -36,22 +34,52 @@ export interface MealPlanResponse {
   status: string;
 }
 
+export interface DietOption {
+  id: string;
+  name: string;
+}
+
+export interface CultureOption {
+  id: string;
+  name: string;
+  region_code: string;
+}
+
+export interface PreferencesPayload {
+  email: string;
+  diet_id: string;
+  culture_id: string;
+  additional_cultures: string[];
+  country: string;
+  city?: string | null;
+  dietary_goals: string[];
+  allergies: string[];
+  disliked_ingredients: string[];
+  meals_per_day: number;
+  household_size: number;
+  cooking_time_limit: number;
+}
+
+export interface SavePreferencesResponse {
+  status: string;
+  workflow_id: string;
+  message: string;
+}
+
 export const api = {
-  fetchDiets: () => http<Array<{ id: number; name: string }>>(`${baseUrl}/diets`),
-  fetchCultures: () => http<Array<{ id: number; name: string }>>(`${baseUrl}/cultures`),
-  savePreferences: (payload: PreferencesFormValues) =>
-    http(`${baseUrl}/user/preferences`, {
+  fetchDiets: () => http<DietOption[]>(`${baseUrl}/diets`),
+  fetchCultures: () => http<CultureOption[]>(`${baseUrl}/cultures`),
+  savePreferences: (payload: PreferencesPayload) =>
+    http<SavePreferencesResponse>(`${baseUrl}/user/preferences`, {
       method: 'POST',
-      body: JSON.stringify({
-        email: payload.email,
-        diet_id: payload.dietId,
-        culture_id: payload.cultureId
-      })
+      body: JSON.stringify(payload)
     }),
+  getPreferences: (email: string) =>
+    http<PreferencesPayload | null>(`${baseUrl}/user/preferences?email=${encodeURIComponent(email)}`),
   getLatestMealPlan: () => http<MealPlanResponse | null>(`${baseUrl}/plans/latest`).catch(() => null),
-  generatePlan: () =>
+  generatePlan: (payload: { email: string; diet_id: string; culture_id: string }) =>
     http<MealPlanResponse>(`${baseUrl}/plans/generate`, {
       method: 'POST',
-      body: JSON.stringify({ email: 'demo@example.com', diet_id: 1, culture_id: 1 })
+      body: JSON.stringify(payload)
     })
 };

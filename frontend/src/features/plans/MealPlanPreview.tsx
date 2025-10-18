@@ -1,13 +1,27 @@
 import { Button, Card, CardContent, CardHeader, Divider, List, ListItem, ListItemText, Stack, Typography } from '@mui/material';
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api/client';
+import { api, type PreferencesPayload } from '../../lib/api/client';
 
 const MealPlanPreview = () => {
   const queryClient = useQueryClient();
   const { data, isFetching } = useQuery({ queryKey: ['meal-plan'], queryFn: api.getLatestMealPlan });
+  const savedPreferences = queryClient.getQueryData<PreferencesPayload | null>([
+    'user-preferences',
+    'demo@example.com'
+  ]);
+
+  const planPayload = useMemo(
+    () => ({
+      email: savedPreferences?.email ?? 'demo@example.com',
+      diet_id: savedPreferences?.diet_id ?? 'balanced',
+      culture_id: savedPreferences?.culture_id ?? 'indian'
+    }),
+    [savedPreferences]
+  );
 
   const mutation = useMutation({
-    mutationFn: api.generatePlan,
+    mutationFn: () => api.generatePlan(planPayload),
     onSuccess: (plan) => {
       queryClient.setQueryData(['meal-plan'], plan);
     }

@@ -1,17 +1,31 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import EmailStr
 
 from ..domain.services.meal_plan_service import MealPlanService
+from ..domain.services.user_preference_service import UserPreferenceService
 from ..schemas.meal import MealPlanCreateRequest, MealPlanResponse
 from ..schemas.metadata import CultureResponse, DietResponse
-from ..schemas.user import LoginRequest, LoginResponse, RegisterRequest, UserPreferencesRequest
+from ..schemas.user import (
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    UserPreferencesRequest,
+    UserPreferencesSaveResponse,
+    UserPreferencesView,
+)
 from ..schemas.workflow import WorkflowCallback
 
 api_router = APIRouter()
 _meal_plan_service = MealPlanService.create_in_memory()
+_user_preference_service = UserPreferenceService()
 
 
 def get_meal_plan_service() -> MealPlanService:
     return _meal_plan_service
+
+
+def get_user_preference_service() -> UserPreferenceService:
+    return _user_preference_service
 
 
 @api_router.post("/auth/register", response_model=LoginResponse, tags=["auth"])
@@ -30,23 +44,56 @@ async def login(payload: LoginRequest) -> LoginResponse:
 @api_router.get("/diets", response_model=list[DietResponse], tags=["metadata"])
 async def list_diets() -> list[DietResponse]:
     return [
-        DietResponse(id=1, name="Vegan"),
-        DietResponse(id=2, name="Halal"),
-        DietResponse(id=3, name="Mediterranean"),
+        DietResponse(id="vegan", name="Vegan"),
+        DietResponse(id="vegetarian", name="Vegetarian"),
+        DietResponse(id="halal", name="Halal"),
+        DietResponse(id="kosher", name="Kosher"),
+        DietResponse(id="low_carb", name="Low-Carb"),
+        DietResponse(id="balanced", name="Balanced"),
+        DietResponse(id="pescatarian", name="Pescatarian"),
+        DietResponse(id="mediterranean", name="Mediterranean"),
+        DietResponse(id="custom", name="Custom"),
     ]
 
 
 @api_router.get("/cultures", response_model=list[CultureResponse], tags=["metadata"])
 async def list_cultures() -> list[CultureResponse]:
     return [
-        CultureResponse(id=1, name="Indian", region_code="IN"),
-        CultureResponse(id=2, name="Italian", region_code="IT"),
+        CultureResponse(id="indian", name="Indian", region_code="IN"),
+        CultureResponse(id="ethiopian", name="Ethiopian", region_code="ET"),
+        CultureResponse(id="italian", name="Italian", region_code="IT"),
+        CultureResponse(id="turkish", name="Turkish", region_code="TR"),
+        CultureResponse(id="mexican", name="Mexican", region_code="MX"),
+        CultureResponse(id="korean", name="Korean", region_code="KR"),
+        CultureResponse(id="nigerian", name="Nigerian", region_code="NG"),
+        CultureResponse(id="peruvian", name="Peruvian", region_code="PE"),
     ]
 
 
-@api_router.post("/user/preferences", tags=["users"])
-async def save_preferences(payload: UserPreferencesRequest) -> dict[str, str]:
-    return {"status": "stored", "email": payload.email}
+@api_router.post(
+    "/user/preferences",
+    response_model=UserPreferencesSaveResponse,
+    tags=["users"],
+    status_code=202,
+)
+async def save_preferences(
+    payload: UserPreferencesRequest,
+    preferences_service: UserPreferenceService = Depends(get_user_preference_service),
+    meal_plan_service: MealPlanService = Depends(get_meal_plan_service),
+) -> UserPreferencesSaveResponse:
+    response = preferences_service.save_preferences(payload)
+    meal_plan_service.create_meal_plan(
+        MealPlanCreateRequest(email=payload.email, diet_id=payload.diet_id, culture_id=payload.culture_id)
+    )
+    return response
+
+
+@api_router.get("/user/preferences", response_model=UserPreferencesView | None, tags=["users"])
+async def fetch_preferences(
+    email: EmailStr,
+    preferences_service: UserPreferenceService = Depends(get_user_preference_service),
+) -> UserPreferencesView | None:
+    return preferences_service.get_preferences(email)
 
 
 @api_router.post(

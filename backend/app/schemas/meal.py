@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class MealItem(BaseModel):
@@ -26,6 +26,6 @@ class MealPlanResponse(BaseModel):
 
 
 class MealPlanCreateRequest(BaseModel):
-    email: str
-    diet_id: int
-    culture_id: int
+    email: EmailStr
+    diet_id: str
+    culture_id: str

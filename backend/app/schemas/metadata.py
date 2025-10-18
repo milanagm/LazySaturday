@@ -2,11 +2,11 @@ from pydantic import BaseModel
 
 
 class DietResponse(BaseModel):
-    id: int
+    id: str
     name: str
 
 
 class CultureResponse(BaseModel):
-    id: int
+    id: str
     name: str
     region_code: str
