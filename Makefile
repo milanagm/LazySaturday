@@ -1,12 +1,18 @@
 .PHONY: backend frontend up down backend-venv
 
-backend:
-	uvicorn backend.app.main:app --reload
+VENV_DIR := .venv
+VENV_BIN := $(VENV_DIR)/bin
+PYTHON := python3
 
-backend-venv:
-	python3 -m venv .venv
-	. .venv/bin/activate && pip install -r backend/requirements.txt
-	@echo "Virtual environment ready. Activate with: source .venv/bin/activate"
+backend: $(VENV_BIN)/uvicorn
+	$(VENV_BIN)/uvicorn backend.app.main:app --reload
+
+backend-venv: $(VENV_BIN)/uvicorn
+	@echo "Virtual environment ready. Activate with: source $(VENV_BIN)/activate"
+
+$(VENV_BIN)/uvicorn: backend/requirements.txt
+	$(PYTHON) -m venv $(VENV_DIR)
+	$(VENV_BIN)/pip install -r backend/requirements.txt
 
 frontend:
 	cd frontend && npm run dev

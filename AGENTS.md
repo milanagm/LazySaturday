@@ -8,8 +8,8 @@
 - `packages/shared-types/` is reserved for generated OpenAPI and Zod contracts shared across services.
 
 ## Build, Test, and Development Commands
-- `make backend` — run the FastAPI dev server via Uvicorn with auto-reload.
-- `make backend-venv` — create `.venv`, install backend requirements, and remind you to `source .venv/bin/activate`.
+- `make backend` — provision `.venv` if missing and run the FastAPI dev server via the local Uvicorn binary.
+- `make backend-venv` — idempotently create `.venv`, install backend requirements, and remind you to `source .venv/bin/activate`.
 - `make frontend` — launch the Vite dev server on port 5173.
 - `make up` / `make down` — start or stop the Docker Compose stack for all services.
 - `pip install -r backend/requirements.txt` and `npm install` (inside `frontend/`) — install runtime dependencies before local work.

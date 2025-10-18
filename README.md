@@ -44,7 +44,7 @@ diet-planner/
 
 2. **Start the backend**
    ```bash
-   uvicorn backend.app.main:app --reload
+   make backend
    ```
 
 3. **Install frontend deps**
