@@ -1,0 +1,145 @@
+{
+  "name": "SultansDiets",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testpath",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "068a147c-7664-4176-bcea-a866d848a417",
+      "name": "Webhook",
+      "webhookId": "e31b313e-6a81-4068-8265-795399a11fe1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        560,
+        0
+      ],
+      "id": "a4f78592-6bd8-42ae-9b83-b24772628000",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body }}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5f9aa1b6-9b13-4128-b4bb-83927860ce83",
+      "name": "AI Agent",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        192,
+        176
+      ],
+      "id": "ef6a0feb-95cf-4fd2-8716-5acc20bdcea4",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "6fjbCJTU3fkox8sS",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"plan_id\": \"6e3e5b63-5e7c-4bbe-8fdc-43b8a37f07cd\",\n  \"meals\": [\n    {\n      \"day_of_week\": \"Monday\",\n      \"meal_type\": \"dinner\",\n      \"recipe_id\": \"indian-1\",\n      \"recipe_title\": \"Indian inspired Monday special\",\n      \"ingredients\": [\n        {\"name\": \"Chickpeas\", \"quantity\": 0.5, \"unit\": \"kg\"},\n        {\"name\": \"Spinach\", \"quantity\": 0.3, \"unit\": \"kg\"}\n      ],\n      \"instructions\": [\n        {\"step_number\": 1, \"description\": \"Rinse ingredients.\"},\n        {\"step_number\": 2, \"description\": \"Simmer for 20 minutes.\", \"duration_minutes\": 20}\n      ],\n      \"nutrition\": {\n        \"calories\": 600,\n        \"protein_g\": 25.0,\n        \"carbs_g\": 70.0,\n        \"fats_g\": 20.0,\n        \"fiber_g\": 12.0,\n        \"micronutrients\": {\"iron_mg\": 5.0}\n      },\n      \"prep_time_minutes\": 15,\n      \"cook_time_minutes\": 30,\n      \"source\": \"generator_v2\",\n      \"tags\": [\"balanced\", \"vegetarian\"]\n    }\n  ],\n  \"shopping_list\": [\n    {\n      \"category\": \"pantry\",\n      \"name\": \"Chickpeas\",\n      \"quantity\": 2.0,\n      \"unit\": \"cans\",\n      \"notes\": \"Prefer low sodium\",\n      \"is_pantry\": false\n    }\n  ],\n  \"summary\": {\n    \"overview\": \"High-protein vegetarian week with gentle prep times.\",\n    \"calorie_total\": 4200,\n    \"macro_totals\": {\n      \"calories\": 4200,\n      \"protein_g\": 210.0,\n      \"carbs_g\": 390.0,\n      \"fats_g\": 140.0,\n      \"fiber_g\": 55.0,\n      \"micronutrients\": {}\n    },\n    \"allergy_warnings\": [\"Peanut-free menu\"],\n    \"variety_score\": 0.82\n  },\n  \"warnings\": [\n    {\"code\": \"LIMITED_INGREDIENT\", \"message\": \"Spinach availability is low.\", \"blocking\": false}\n  ],\n  \"diagnostics\": {\n    \"prompt_versions\": [\"mealplan:2.1.0\"],\n    \"rule_hits\": [\"balanced_macro_constraints\"],\n    \"raw_context\": {\"upstream_latency_ms\": 850}\n  },\n  \"status\": \"ready\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        192
+      ],
+      "id": "6cc1c61f-3b64-41a5-a177-8576dbdbbf85",
+      "name": "Structured Output Parser"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "555dd1e4-0c5f-43e6-8382-5a4a23b65627",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7fea3e6c7513f756cfc3455590ae57b77fca8f7ffba269cca9490e69f6d35efa"
+  },
+  "id": "WdeJuLnuv2X9AY0q",
+  "tags": []
+}
