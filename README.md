@@ -36,9 +36,10 @@ diet-planner/
 
 ## Getting Started
 
-1. **Install backend deps**
+1. **Create & activate backend virtualenv**
    ```bash
-   pip install -r backend/requirements.txt
+   make backend-venv
+   source .venv/bin/activate
    ```
 
 2. **Start the backend**
