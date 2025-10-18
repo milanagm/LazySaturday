@@ -55,6 +55,11 @@ diet-planner/
 4. **Open the app**
    Visit `http://localhost:5173` and use the form to trigger the stubbed meal plan generation workflow.
 
+5. **Run backend tests**
+   ```bash
+   make backend-test
+   ```
+
 ## Docker Compose
 
 A minimal containerized setup lives in `infra/compose/docker-compose.yml` and wires together the frontend, backend, n8n, Postgres, and Redis services.

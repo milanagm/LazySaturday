@@ -1,4 +1,4 @@
-.PHONY: backend frontend up down backend-venv
+.PHONY: backend frontend up down backend-venv backend-test
 
 VENV_DIR := .venv
 VENV_BIN := $(VENV_DIR)/bin
@@ -11,6 +11,9 @@ backend: $(VENV_BIN)/uvicorn
 
 backend-venv: $(VENV_BIN)/uvicorn
 	@echo "Virtual environment ready. Activate with: source $(VENV_BIN)/activate"
+
+backend-test: $(VENV_BIN)/uvicorn
+	$(VENV_BIN)/pytest backend/app
 
 $(VENV_BIN)/uvicorn: backend/requirements.txt
 	$(PYTHON) -m venv $(VENV_DIR)

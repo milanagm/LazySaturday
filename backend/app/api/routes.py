@@ -82,8 +82,10 @@ async def save_preferences(
     meal_plan_service: MealPlanService = Depends(get_meal_plan_service),
 ) -> UserPreferencesSaveResponse:
     response = preferences_service.save_preferences(payload)
+    preferences_snapshot = preferences_service.get_preferences(payload.email)
     meal_plan_service.create_meal_plan(
-        MealPlanCreateRequest(email=payload.email, diet_id=payload.diet_id, culture_id=payload.culture_id)
+        MealPlanCreateRequest(email=payload.email, diet_id=payload.diet_id, culture_id=payload.culture_id),
+        preferences=preferences_snapshot,
     )
     return response
 
@@ -102,10 +104,13 @@ async def fetch_preferences(
     tags=["meal-plans"],
 )
 async def generate_plan(
-    request: MealPlanCreateRequest, service: MealPlanService = Depends(get_meal_plan_service)
+    request: MealPlanCreateRequest,
+    service: MealPlanService = Depends(get_meal_plan_service),
+    preferences_service: UserPreferenceService = Depends(get_user_preference_service),
 ) -> MealPlanResponse:
+    preferences_snapshot = request.preferences_override or preferences_service.get_preferences(request.email)
     try:
-        return service.create_meal_plan(request)
+        return service.create_meal_plan(request, preferences=preferences_snapshot)
     except ValueError as exc:  # pragma: no cover - simple example
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
