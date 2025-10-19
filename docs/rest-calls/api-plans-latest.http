@@ -1,0 +1,4 @@
+### Request the latest meal plan for the authenticated user
+GET http://localhost:5173/api/plans/latest
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZW9wb2xkQHRlc3QuZGUiLCJleHAiOjE3NjA4NjMxODJ9.6IClQ1fL-0TQDp-k6z2NZ2xBlzL7i4UVX0li_CjzxGM
+Accept: application/json

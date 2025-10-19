@@ -179,6 +179,27 @@ async def generate_plan(
     return plan
 
 
+@api_router.get("/plans/latest", response_model=MealPlanResponse | None, tags=["meal-plans"])
+async def get_latest_plan(
+    service: MealPlanService = Depends(get_meal_plan_service),
+    current_user=Depends(get_current_user),
+) -> MealPlanResponse | None:
+    logger.info("Fetching latest meal plan", extra={"email": current_user.email})
+    latest = service.get_latest(current_user.email)
+    if latest:
+        logger.info(
+            "Latest plan lookup result",
+            extra={"requested_email": current_user.email, "plan_email": latest.user_email},
+        )
+        if latest.user_email.lower() != current_user.email.lower():
+            logger.warning(
+                "Plan belongs to different user",
+                extra={"requested_email": current_user.email, "plan_email": latest.user_email},
+            )
+            return None
+    return latest
+
+
 @api_router.get("/plans/{plan_id}", response_model=MealPlanResponse, tags=["meal-plans"])
 async def get_plan(
     plan_id: str,
@@ -189,17 +210,6 @@ async def get_plan(
     if not plan or plan.user_email.lower() != current_user.email:
         raise HTTPException(status_code=404, detail="Meal plan not found")
     return plan
-
-
-@api_router.get("/plans/latest", response_model=MealPlanResponse | None, tags=["meal-plans"])
-async def get_latest_plan(
-    service: MealPlanService = Depends(get_meal_plan_service),
-    current_user=Depends(get_current_user),
-) -> MealPlanResponse | None:
-    latest = service.get_latest(current_user.email)
-    if latest and latest.user_email.lower() != current_user.email:
-        return None
-    return latest
 
 
 @api_router.get("/plans/today", response_model=TodayOverviewResponse | None, tags=["meal-plans"])

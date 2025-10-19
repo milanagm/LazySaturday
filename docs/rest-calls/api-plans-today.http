@@ -1,0 +1,4 @@
+### Request today's overview for the authenticated user
+GET http://localhost:5173/api/plans/today
+Authorization: Bearer {{token}}
+Accept: application/json

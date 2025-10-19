@@ -5,6 +5,9 @@ from datetime import date, datetime, time
 from typing import Dict, Optional
 from uuid import UUID, uuid4
 
+import logging
+from sqlalchemy.exc import SQLAlchemyError
+
 from ...schemas.meal import (
     MealIngredient,
     MealInstruction,
@@ -20,6 +23,9 @@ from ...schemas.meal import (
 )
 from ...schemas.user import UserPreferencesView
 from ...schemas.workflow import WorkflowPlanCallback
+from ...core.database import session_scope
+from ..repositories import meal_plan_repository
+
 from ..meal_planning.contracts import (
     GeneratedMeal,
     MealPlanGenerationContext,
@@ -95,6 +101,7 @@ class MealPlanService:
         self._generator = generator
         self._latest_by_user: Dict[str, UUID] = {}
         self._fallback_generator = fallback_generator
+        self._logger = logging.getLogger(__name__)
 
     @classmethod
     def create_in_memory(cls) -> "MealPlanService":
@@ -163,10 +170,7 @@ class MealPlanService:
             diet_id=callback.plan.diet_id,
             culture_id=callback.plan.culture_id,
         )
-        self._storage[plan_id] = record
-        self._latest_by_user[email] = plan_id
-        self._last_created_id = plan_id
-        return record.to_response()
+        return self._save_record(record)
 
     def mark_plan_failed(self, callback: WorkflowPlanCallback) -> None:
         email = callback.user_email.lower()
@@ -174,8 +178,9 @@ class MealPlanService:
         record = self._storage.get(request_id)
         if record:
             record.status = callback.status
+            self._save_record(record)
         else:
-            record = MealPlanRecord(
+            placeholder = MealPlanRecord(
                 id=request_id,
                 user_email=email,
                 week_start=date.today(),
@@ -187,9 +192,7 @@ class MealPlanService:
                 diet_id="unknown",
                 culture_id="unknown",
             )
-            self._storage[request_id] = record
-        self._latest_by_user[email] = request_id
-        self._last_created_id = request_id
+            self._save_record(placeholder)
 
     def get_meal_plan(self, plan_id: str) -> Optional[MealPlanResponse]:
         try:
@@ -197,19 +200,47 @@ class MealPlanService:
         except ValueError:
             return None
         record = self._storage.get(uid)
-        return record.to_response() if record else None
+        if record:
+            return record.to_response()
+
+        response = self._fetch_plan_from_db(uid)
+        if response:
+            hydrated = self._record_from_response(response)
+            self._cache_record(hydrated)
+            return response
+
+        return None
 
     def get_latest(self, email: str | None = None) -> Optional[MealPlanResponse]:
         if email:
-            record_id = self._latest_by_user.get(email.lower())
-            if not record_id:
-                return None
-            record = self._storage.get(record_id)
-            return record.to_response() if record else None
-        if not self._last_created_id:
+            key = email.lower()
+            record_id = self._latest_by_user.get(key)
+            if record_id:
+                cached = self._storage.get(record_id)
+                if cached:
+                    return cached.to_response()
+
+            response = self._fetch_latest_for_user(key)
+            if response:
+                hydrated = self._record_from_response(response)
+                self._cache_record(hydrated)
+                return response
+            self._logger.debug("No meal plan found for user", extra={"email": key})
             return None
-        record = self._storage.get(self._last_created_id)
-        return record.to_response() if record else None
+
+        if self._last_created_id:
+            cached = self._storage.get(self._last_created_id)
+            if cached:
+                return cached.to_response()
+
+        response = self._fetch_most_recent()
+        if response:
+            hydrated = self._record_from_response(response)
+            self._cache_record(hydrated)
+            return response
+
+        self._logger.debug("No meal plans found in storage or database")
+        return None
 
     def get_today_overview(
         self, email: str | None = None, *, now: datetime | None = None
@@ -418,10 +449,7 @@ class MealPlanService:
             diet_id=context.preferences.diet_id,
             culture_id=context.preferences.culture_id,
         )
-        self._storage[plan_id] = record
-        self._last_created_id = plan_id
-        self._latest_by_user[context.user_email] = plan_id
-        return record.to_response()
+        return self._save_record(record)
 
     def _create_pending_record(self, context: MealPlanGenerationContext) -> MealPlanResponse:
         plan_id = context.request_id
@@ -437,20 +465,35 @@ class MealPlanService:
             diet_id=context.preferences.diet_id,
             culture_id=context.preferences.culture_id,
         )
-        self._storage[plan_id] = record
-        self._last_created_id = plan_id
-        self._latest_by_user[context.user_email] = plan_id
-        return record.to_response()
+        return self._save_record(record)
 
     def _get_latest_record(self, email: str | None) -> MealPlanRecord | None:
         if email:
-            record_id = self._latest_by_user.get(email.lower())
-            if not record_id:
-                return None
-            return self._storage.get(record_id)
-        if not self._last_created_id:
+            key = email.lower()
+            record_id = self._latest_by_user.get(key)
+            if record_id:
+                cached = self._storage.get(record_id)
+                if cached:
+                    return cached
+            response = self._fetch_latest_for_user(key)
+            if response:
+                record = self._record_from_response(response)
+                self._cache_record(record)
+                return record
             return None
-        return self._storage.get(self._last_created_id)
+
+        if self._last_created_id:
+            cached = self._storage.get(self._last_created_id)
+            if cached:
+                return cached
+
+        response = self._fetch_most_recent()
+        if response:
+            record = self._record_from_response(response)
+            self._cache_record(record)
+            return record
+
+        return None
 
     def _meal_order_index(self, meal_type: str) -> int:
         try:
@@ -473,3 +516,65 @@ class MealPlanService:
         if current < time(22, 0):
             return "Good evening"
         return "Good night"
+
+    def _save_record(self, record: MealPlanRecord) -> MealPlanResponse:
+        self._cache_record(record)
+        response = record.to_response()
+        self._persist_response(response)
+        return response
+
+    def _cache_record(self, record: MealPlanRecord) -> None:
+        self._storage[record.id] = record
+        self._last_created_id = record.id
+        self._latest_by_user[record.user_email.lower()] = record.id
+
+    def _persist_response(self, response: MealPlanResponse) -> None:
+        try:
+            with session_scope() as session:
+                meal_plan_repository.upsert_plan(session, response)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive fallback
+            self._logger.warning(
+                "Failed to persist meal plan", extra={"plan_id": str(response.id), "error": str(exc)}
+            )
+
+    def _record_from_response(self, response: MealPlanResponse) -> MealPlanRecord:
+        return MealPlanRecord(
+            id=response.id,
+            user_email=response.user_email,
+            week_start=response.week_start,
+            meals=response.meals,
+            shopping_list=response.shopping_list,
+            summary=response.summary,
+            warnings=response.warnings,
+            status=response.status,
+            diet_id=response.diet_id,
+            culture_id=response.culture_id,
+        )
+
+    def _fetch_plan_from_db(self, plan_id: UUID) -> Optional[MealPlanResponse]:
+        try:
+            with session_scope() as session:
+                return meal_plan_repository.get_plan(session, plan_id)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive fallback
+            self._logger.warning(
+                "Failed to fetch meal plan from database", extra={"plan_id": str(plan_id), "error": str(exc)}
+            )
+            return None
+
+    def _fetch_latest_for_user(self, email: str) -> Optional[MealPlanResponse]:
+        try:
+            with session_scope() as session:
+                return meal_plan_repository.get_latest_for_user(session, email)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive fallback
+            self._logger.warning(
+                "Failed to fetch latest meal plan for user", extra={"email": email, "error": str(exc)}
+            )
+            return None
+
+    def _fetch_most_recent(self) -> Optional[MealPlanResponse]:
+        try:
+            with session_scope() as session:
+                return meal_plan_repository.get_most_recent(session)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive fallback
+            self._logger.warning("Failed to fetch most recent meal plan", extra={"error": str(exc)})
+            return None

@@ -93,6 +93,7 @@ Make sure Postgres, Redis, and n8n are available (e.g., via `docker compose up p
 - Provide a Gemini / PaLM API credential inside n8n named `Google Gemini(PaLM) Api account` to satisfy the workflow nodes, or swap the LLM node for an available provider.
 - When developing without n8n, set `DIET_N8N_MEAL_PLAN_PATH=` (empty) and swap the generator back to the stub inside `backend/app/api/routes.py`.
 - When the workflow finishes, POST the generated plan back to `POST /api/workflows/plan-complete` (see `docs/rest-calls/n8n-plan-callback.http`). The backend stores the plan asynchronously and updates users’ dashboards.
+- All generated plans are persisted in Postgres (`meal_plans` table) so the dashboard survives restarts even when generation is asynchronous.
 
 ## Next Steps
 

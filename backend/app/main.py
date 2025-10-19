@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from .api.routes import api_router
 from .core.database import Base, engine
+from .domain import entities  # noqa: F401
 
 
 def create_app() -> FastAPI:
