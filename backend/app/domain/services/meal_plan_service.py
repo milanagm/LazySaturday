@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Dict, Optional
 from uuid import UUID, uuid4
 
@@ -253,10 +253,16 @@ class MealPlanService:
         today = current_datetime.date()
         weekday = today.strftime("%A").lower()
         day_meals = [meal for meal in record.meals if meal.day_of_week.lower() == weekday]
-        if not day_meals:
-            return None
 
-        ordered_meals = sorted(day_meals, key=self._meal_sort_key)
+        fallback_to_full_plan = False
+        if day_meals:
+            ordered_meals = sorted(day_meals, key=self._meal_sort_key)
+        else:
+            if not record.meals:
+                return None
+            ordered_meals = sorted(record.meals, key=self._meal_sort_key)
+            fallback_to_full_plan = True
+
         current_time = current_datetime.time()
 
         timeline: list[tuple[MealItem, time, str]] = []
@@ -264,14 +270,14 @@ class MealPlanService:
         for idx, meal in enumerate(ordered_meals):
             scheduled = self._scheduled_time_for(meal.meal_type)
             status = "upcoming"
-            if scheduled <= current_time:
+            if not fallback_to_full_plan and scheduled <= current_time:
                 status = "completed"
             timeline.append((meal, scheduled, status))
             if status == "upcoming" and next_index is None:
                 next_index = idx
 
         if next_index is None:
-            next_index = len(timeline) - 1
+            next_index = 0 if fallback_to_full_plan else len(timeline) - 1
 
         meals_response: list[TodayMeal] = []
         current_meal: TodayMeal | None = None
@@ -296,6 +302,39 @@ class MealPlanService:
 
         greeting = self._greeting_for_time(current_time)
 
+        # Build upcoming days summary
+        upcoming_days_map: Dict[str, list[MealItem]] = {}
+        for meal in record.meals:
+            upcoming_days_map.setdefault(meal.day_of_week.lower(), []).append(meal)
+
+        tomorrow_preview = None
+        next_day_key = (today + timedelta(days=1)).strftime("%A").lower()
+        candidate_tomorrow = sorted(upcoming_days_map.get(next_day_key, []), key=self._meal_sort_key)
+        if candidate_tomorrow:
+            first = candidate_tomorrow[0]
+            tomorrow_preview = TodayMeal(
+                meal_type=first.meal_type,
+                meal_label=first.meal_type.replace("_", " ").title(),
+                recipe_title=first.recipe_title,
+                instructions=first.instructions,
+                scheduled_time=self._scheduled_time_for(first.meal_type).strftime("%H:%M"),
+                status="upcoming",
+                is_current=False,
+            )
+
+        upcoming_days = []
+        for offset in range(1, 7):
+            target_date = today + timedelta(days=offset)
+            key = target_date.strftime("%A").lower()
+            meals_for_day = [self._map_meal_for_summary(meal) for meal in sorted(upcoming_days_map.get(key, []), key=self._meal_sort_key)]
+            upcoming_days.append(
+                {
+                    "date": target_date,
+                    "label": target_date.strftime("%A"),
+                    "meals": meals_for_day,
+                }
+            )
+
         return TodayOverviewResponse(
             date=today,
             greeting=greeting,
@@ -304,6 +343,8 @@ class MealPlanService:
             plan_status=record.status,
             current_meal=current_meal,
             meals=meals_response,
+            tomorrow_preview=tomorrow_preview,
+            upcoming_days=upcoming_days,
         )
 
     def _build_context(
@@ -516,6 +557,14 @@ class MealPlanService:
         if current < time(22, 0):
             return "Good evening"
         return "Good night"
+
+    def _map_meal_for_summary(self, meal: MealItem) -> Dict[str, Any]:
+        return {
+            "meal_type": meal.meal_type,
+            "meal_label": meal.meal_type.replace("_", " ").title(),
+            "recipe_title": meal.recipe_title,
+            "scheduled_time": self._scheduled_time_for(meal.meal_type).strftime("%H:%M"),
+        }
 
     def _save_record(self, record: MealPlanRecord) -> MealPlanResponse:
         self._cache_record(record)

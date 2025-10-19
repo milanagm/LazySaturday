@@ -108,3 +108,5 @@ class TodayOverviewResponse(BaseModel):
     plan_status: str
     current_meal: TodayMeal | None
     meals: list[TodayMeal]
+    tomorrow_preview: TodayMeal | None = None
+    upcoming_days: list[dict[str, Any]] = Field(default_factory=list)
